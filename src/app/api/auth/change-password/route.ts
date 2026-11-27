@@ -1,0 +1,8 @@
+import { NextResponse } from "next/server";
+import argon2 from "argon2";
+import { z } from "zod";
+import { createSession,getCurrentUser } from "@/lib/auth";
+import { db } from "@/lib/db";
+import { writeAuditLog } from "@/lib/audit-log";
+const schema=z.object({currentPassword:z.string().max(1024).optional(),newPassword:z.string().min(1).max(1024)});
+export async function POST(request:Request){const actor=await getCurrentUser();if(!actor)return NextResponse.json({error:"Sesi tidak ditemukan. Silakan login kembali."},{status:401});let body:unknown;try{body=await request.json();}catch{return NextResponse.json({error:"Format permintaan tidak valid."},{status:400});}const parsed=schema.safeParse(body);if(!parsed.success)return NextResponse.json({error:"Password baru wajib diisi."},{status:422});const user=await db.user.findUnique({where:{id:actor.id}});if(!user)return NextResponse.json({error:"Akun tidak ditemukan."},{status:404});if(!user.mustChangePassword){if(!parsed.data.currentPassword)return NextResponse.json({error:"Password saat ini wajib diisi."},{status:422});const valid=await argon2.verify(user.passwordHash,parsed.data.currentPassword).catch(()=>false);if(!valid)return NextResponse.json({error:"Password saat ini tidak sesuai."},{status:401});}const passwordHash=await argon2.hash(parsed.data.newPassword,{type:argon2.argon2id});await db.$transaction(async tx=>{await tx.user.update({where:{id:user.id},data:{passwordHash,mustChangePassword:false}});await tx.session.deleteMany({where:{userId:user.id}});await writeAuditLog(tx,actor,{action:"ACCOUNT_PASSWORD_CHANGED",entityType:"ACCOUNT",entityId:user.id,metadata:{forcedChange:user.mustChangePassword,sessionsRevoked:true}});});await createSession(user.id);return NextResponse.json({ok:true});}

@@ -1,0 +1,3 @@
+import Link from "next/link";
+import { ShieldCheck } from "lucide-react";
+export default function PersitRegistrationSuccessPage(){return <main className="login-shell"><section className="login-card" aria-labelledby="registration-success-title"><div className="brand-mark"><ShieldCheck size={25}/></div><p className="eyebrow">REGISTRASI DITERIMA</p><h1 id="registration-success-title">Permintaan tercatat</h1><p className="muted login-description">Akun Persit berhasil dibuat. Pengaitan dengan personel menunggu verifikasi Super Admin. Setelah diverifikasi, identitas dan status kehadiran personel yang terhubung akan tersedia di dashboard Persit.</p><Link className="primary-button registration-link" href="/login">Kembali ke halaman masuk</Link></section></main>;}

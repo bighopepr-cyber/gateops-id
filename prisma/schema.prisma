@@ -1,0 +1,128 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  SUPER_ADMIN
+  KOMANDAN
+  PERSONEL
+  PERSIT
+}
+
+enum PresenceStatus {
+  DI_DALAM
+  DI_LUAR
+}
+
+
+model User {
+  id                 String    @id @default(cuid())
+  username           String    @unique @db.VarChar(80)
+  passwordHash       String    @map("password_hash")
+  role               Role
+  displayName        String    @map("display_name") @db.VarChar(160)
+  nrp                String?   @db.VarChar(40)
+  rank               String?   @db.VarChar(100)
+  position           String?   @db.VarChar(160)
+  presenceStatus     PresenceStatus @default(DI_DALAM) @map("presence_status")
+  gpsLatitude        Float?    @map("gps_latitude")
+  gpsLongitude       Float?    @map("gps_longitude")
+  gpsUpdatedAt       DateTime? @map("gps_updated_at")
+  gpsPermissionRevokedAt DateTime? @map("gps_permission_revoked_at")
+  mustChangePassword Boolean   @default(false) @map("must_change_password")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+  sessions           Session[]
+  linkedPersonnelId  String?   @map("linked_personnel_id")
+  linkedPersonnel    User?     @relation("PersitPersonnelLink", fields: [linkedPersonnelId], references: [id], onDelete: Cascade)
+  linkedPersitAccounts User[]  @relation("PersitPersonnelLink")
+  activities          Activity[] @relation("PersonnelActivities")
+  auditLogs           AuditLog[] @relation("AuditActor")
+  @@index([role])
+  @@index([nrp])
+  @@index([linkedPersonnelId])
+  @@map("users")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique @map("token_hash")
+  userId    String   @map("user_id")
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+
+enum GateStatus {
+  AKTIF
+  NONAKTIF
+}
+
+model Gate {
+  id        String     @id @default(cuid())
+  name      String     @db.VarChar(120)
+  location  String     @db.VarChar(240)
+  status    GateStatus @default(AKTIF)
+  qrTokenHash String?   @unique @map("qr_token_hash") @db.Char(64)
+  createdAt DateTime   @default(now()) @map("created_at")
+  updatedAt DateTime   @updatedAt @map("updated_at")
+  exitActivities   Activity[] @relation("ActivityExitGate")
+  returnActivities Activity[] @relation("ActivityReturnGate")
+  @@index([status])
+  @@index([name])
+  @@map("gates")
+}
+
+enum ActivityStatus {
+  AKTIF
+  SELESAI
+}
+
+model Activity {
+  id              String         @id @default(cuid())
+  personnelId     String         @map("personnel_id")
+  exitGateId      String         @map("exit_gate_id")
+  returnGateId    String?        @map("return_gate_id")
+  destination     String         @db.VarChar(240)
+  purpose         String         @db.VarChar(500)
+  status          ActivityStatus @default(AKTIF)
+  exitAt          DateTime       @default(now()) @map("exit_at")
+  returnAt        DateTime?      @map("return_at")
+  durationSeconds Int?           @map("duration_seconds")
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+  personnel       User           @relation("PersonnelActivities", fields: [personnelId], references: [id], onDelete: Cascade)
+  exitGate        Gate           @relation("ActivityExitGate", fields: [exitGateId], references: [id], onDelete: Restrict)
+  returnGate      Gate?          @relation("ActivityReturnGate", fields: [returnGateId], references: [id], onDelete: Restrict)
+  @@index([personnelId, status, exitAt])
+  @@index([exitGateId])
+  @@index([returnGateId])
+  @@map("activities")
+}
+
+model AuditLog {
+  id                String   @id @default(cuid())
+  actorUserId       String?  @map("actor_user_id")
+  actorUsername     String   @map("actor_username") @db.VarChar(80)
+  actorDisplayName  String   @map("actor_display_name") @db.VarChar(160)
+  actorRole         Role     @map("actor_role")
+  action            String   @db.VarChar(80)
+  entityType        String   @map("entity_type") @db.VarChar(80)
+  entityId          String?  @map("entity_id") @db.VarChar(191)
+  metadata          Json     @default("{}")
+  createdAt         DateTime @default(now()) @map("created_at")
+  actor             User?    @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+  @@index([createdAt])
+  @@index([actorUserId, createdAt])
+  @@index([entityType, entityId])
+  @@map("audit_logs")
+}

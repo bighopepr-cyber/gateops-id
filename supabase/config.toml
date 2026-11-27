@@ -1,0 +1,8 @@
+project_id = "gateops-local"
+
+[db]
+major_version = 17
+
+[functions.gateops-api]
+# GATEOPS validates its own server-to-server credential and opaque application session.
+verify_jwt = false
